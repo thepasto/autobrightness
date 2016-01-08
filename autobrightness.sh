@@ -20,11 +20,8 @@ function getBright(){
 		ffmpeg -nostats -loglevel 0 -f v4l2 -i $CAMERA -vframes 1 $CAPTURE > /dev/null
 		sleep 1
 		b=$(convert $CAPTURE -colorspace Gray -format "%[mean]" info: | awk -F'.' '{print $1}')
-		echo "TORNO0 $b"
 		b=$((b/(BFACTOR *100)))
-		echo "TORNO $b"
 		bres=$(((MAX*b)/100))
-		echo "TORNO2 $bres"
 		setBright
 		sleep $INTERVAL
 	done
