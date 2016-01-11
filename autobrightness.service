@@ -1,0 +1,10 @@
+[Unit]
+Description=Autobrightness
+
+[Service]
+ExecStart=/opt/autobrightness/autobrightness.sh start 
+ExecStop=/opt/autobrightness/autobrightness.sh stop
+Type=forking
+
+[Install]
+WantedBy=multi-user.target

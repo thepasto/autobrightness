@@ -1,47 +1,37 @@
 #!/bin/bash
 
 CAMERA=/dev/video0
-SCREEN=/sys/class/backlight/intel_backlight/brightness
+BACKLIGHT_PATH=/sys/class/backlight/intel_backlight
 CAPTURE=/tmp/autobrightness.jpg
 INTERVAL=300
-DEFAULT=900
-BFACTOR=12
+BFACTOR=13
 
 function getBright(){
 	while true 
 	do
-		getMaxBright
-		getCurrentBright
+		getBrightValues
 		rm -f $CAPTURE
 		if [ ! -e $CAMERA ]; then
-			sleep 1
-			break
+			continue
 		fi
-		ffmpeg -nostats -loglevel 0 -f v4l2 -i $CAMERA -vframes 1 $CAPTURE > /dev/null
-		sleep 1
+		ffmpeg -nostats -loglevel 0 -f v4l2 -i $CAMERA -vframes 1 -y $CAPTURE > /dev/null
 		b=$(convert $CAPTURE -colorspace Gray -format "%[mean]" info: | awk -F'.' '{print $1}')
 		b=$((b/(BFACTOR *100)))
 		bres=$(((MAX*b)/100))
 		setBright
 		sleep $INTERVAL
 	done
-	getBright
 }
 
-function getMaxBright (){
+function getBrightValues (){
 	AC=$(cat /sys/class/power_supply/AC0/online)
-	MAX=$(cat /sys/class/backlight/intel_backlight/max_brightness)
+	MAX=$(cat "$BACKLIGHT_PATH/max_brightness")
+	CBR=$(cat "$BACKLIGHT_PATH/brightness");
 	if [ $AC == 0 ];then
-		BFACTOR=$((BFACTOR*2))
+		m=$( echo $BFACTOR/10 | bc )
+		BFACTOR=$( echo $BFACTOR*$m | bc )
+		BFACTOR=${BFACTOR%.*}
 	fi
-}
-
-function runningInst (){
-	ABPID=$(ps ax | grep "autobrightness.sh start" | grep -v "grep" | awk '{print $1}')
-}
-
-function getCurrentBright (){
-	CBR=$(cat $SCREEN);
 }
 
 function setBright (){
@@ -52,8 +42,11 @@ function setBright (){
 		count=$mincn
 		count2=0
 		until [ $count -gt $maxcn ]; do
+			if [[ $count -lt 50 ]];then
+				break
+			fi
 			if [ $count2 -eq 5 ];then
-				echo $count > $SCREEN
+				echo $count > "$BACKLIGHT_PATH/brightness"
 				count2=0
 				sleep 0.005
 			fi
@@ -66,8 +59,11 @@ function setBright (){
 		count=$maxcn
 		count2=0
 		until [ $count -lt $mincn ]; do
+			if [[ $count -lt 50 ]];then
+				break
+			fi
 			if [ $count2 -eq 5 ]; then
-				echo $count > $SCREEN
+				echo $count > "$BACKLIGHT_PATH/brightness"
 				count2=0
 				sleep 0.005
 			fi
@@ -75,11 +71,7 @@ function setBright (){
 			let count2+=1
 		done
 	fi
-
-	
-
 }
-
 
 case "$1" in
 	start)
@@ -96,8 +88,7 @@ case "$1" in
 
 	stop) 
 		echo -en "Stopping $0 \t"
-		runningInst
-		kill -s 9 $ABPID & > /dev/null
+		kill -15 $$ & > /dev/null
 		if [ $? == 0 ];then
 			echo "[OK]"
 		else
