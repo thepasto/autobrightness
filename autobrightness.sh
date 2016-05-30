@@ -2,76 +2,108 @@
 
 CAMERA=/dev/video0
 BACKLIGHT_PATH=/sys/class/backlight/intel_backlight
+KEYBOARD_PATH=/sys/class/leds/asus::kbd_backlight
 CAPTURE=/tmp/autobrightness.jpg
-INTERVAL=300
-BFACTOR=13
+INTERVAL=120
+BFACTOR=10
+LOWBRIGHT=320 # luminosità minima monitor
+
 
 function getBright(){
 	while true 
 	do
-		getBrightValues
-		rm -f $CAPTURE
-		if [ ! -e $CAMERA ]; then
-			continue
+		standby=$(cat $BACKLIGHT_PATH/brightness)
+echo "STANDBY: " $standby
+		if [ $standby -gt $LOWBRIGHT ]; then # se monitor in standby non esegue script
+			getBrightValues
+			rm -f $CAPTURE
+			if [ ! -e $CAMERA ]; then
+				continue
+			fi
+			ffmpeg -nostats -loglevel 0 -f v4l2 -i $CAMERA -vframes 1 -y $CAPTURE > /dev/null
+			b=$(convert $CAPTURE -colorspace Gray -format "%[mean]" info: | awk -F'.' '{print $1}')
+			rm -f $CAPTURE
+			b=$((b/(BFACTOR *80)))
+echo "B: " $b
+			bres=$(((MAX*b)/100))
+echo "bres: " $bres
+			setBright
 		fi
-		ffmpeg -nostats -loglevel 0 -f v4l2 -i $CAMERA -vframes 1 -y $CAPTURE > /dev/null
-		b=$(convert $CAPTURE -colorspace Gray -format "%[mean]" info: | awk -F'.' '{print $1}')
-		b=$((b/(BFACTOR *100)))
-		bres=$(((MAX*b)/100))
-		setBright
 		sleep $INTERVAL
 	done
 }
 
+
 function getBrightValues (){
 	AC=$(cat /sys/class/power_supply/AC0/online)
 	MAX=$(cat "$BACKLIGHT_PATH/max_brightness")
-	CBR=$(cat "$BACKLIGHT_PATH/brightness");
-	if [ $AC == 0 ];then
+	CBR=$(cat "$BACKLIGHT_PATH/brightness")
+	if [ $AC == 0 ];then # batteria
 		m=$( echo $BFACTOR/10 | bc )
 		BFACTOR=$( echo $BFACTOR*$m | bc )
 		BFACTOR=${BFACTOR%.*}
+		$INTERVAL = 300 # 5 minuti se batteria
+	else
+		$INTERVAL = 120 # 2 minuti se collegato AC
 	fi
 }
 
+
 function setBright (){
-	maxcn=$(( bres > CBR ? bres : CBR ))
-	mincn=$(( bres < CBR ? bres : CBR ))
+		setKeyboardBright
+		maxcn=$(( bres > CBR ? bres : CBR ))
+		mincn=$(( bres < CBR ? bres : CBR ))
+echo "MAXCN: " $maxcn
+echo "MINCN: " $mincn
+echo "BRES: " $bres
 	
-	if [[ $maxcn -eq $bres ]]; then
-		count=$mincn
-		count2=0
-		until [ $count -gt $maxcn ]; do
-			if [[ $count -lt 50 ]];then
-				break
-			fi
-			if [ $count2 -eq 5 ];then
-				echo $count > "$BACKLIGHT_PATH/brightness"
-				count2=0
-				sleep 0.005
-			fi
-			let count+=1
-			let count2+=1
-		done
+		if [[ $maxcn -eq $bres ]]; then
+			count=$mincn
+			count2=0
+			until [ $count -gt $maxcn ]; do
+				if [[ $count -lt 50 ]];then
+					break
+				fi
+				if [ $count2 -eq 5 ];then
+					echo $count > "$BACKLIGHT_PATH/brightness"
+echo "AUMENTO: " $count
+					count2=0
+					sleep 0.005
+				fi
+				let count+=1
+				let count2+=1
+			done
+		fi
+	
+		if [[ $mincn -eq $bres ]]; then
+			count=$maxcn
+			count2=0
+			until [ $count -lt $mincn ]; do
+				if [[ $count -lt 320 ]];then
+					break
+				fi
+				if [ $count2 -eq 5 ]; then
+					echo $count > "$BACKLIGHT_PATH/brightness"
+echo "DIMINUISCO: " $count
+					count2=0
+					sleep 0.005
+				fi
+				let count-=1
+				let count2+=1
+			done
+		fi
+}
+
+
+function setKeyboardBright(){
+	if [ $bres -le "1100" ]; then
+	  	echo 1 > "$KEYBOARD_PATH/brightness"
 	fi
-	
-	if [[ $mincn -eq $bres ]]; then
-		count=$maxcn
-		count2=0
-		until [ $count -lt $mincn ]; do
-			if [[ $count -lt 50 ]];then
-				break
-			fi
-			if [ $count2 -eq 5 ]; then
-				echo $count > "$BACKLIGHT_PATH/brightness"
-				count2=0
-				sleep 0.005
-			fi
-			let count-=1
-			let count2+=1
-		done
+	if [ $bres -gt "1100" ]; then
+		echo 0 > "$KEYBOARD_PATH/brightness"
 	fi
 }
+
 
 case "$1" in
 	start)
@@ -110,6 +142,3 @@ case "$1" in
 esac
 
 exit 0
-
-getBright
-
