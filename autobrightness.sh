@@ -6,15 +6,13 @@ KEYBOARD_PATH=/sys/class/leds/asus::kbd_backlight
 CAPTURE=/tmp/autobrightness.jpg
 INTERVAL=120
 BFACTOR=10
-LOWBRIGHT=320 # luminosità minima monitor
-
 
 function getBright(){
 	while true 
 	do
-		standby=$(cat $BACKLIGHT_PATH/brightness)
+		standby=$(cat $BACKLIGHT_PATH/actual_brightness)
 echo "STANDBY: " $standby
-		if [ $standby -gt $LOWBRIGHT ]; then # se monitor in standby non esegue script
+		if [ $standby -gt 0 ]; then # se monitor in standby non esegue script
 			getBrightValues
 			rm -f $CAPTURE
 			if [ ! -e $CAMERA ]; then
@@ -42,9 +40,9 @@ function getBrightValues (){
 		m=$( echo $BFACTOR/10 | bc )
 		BFACTOR=$( echo $BFACTOR*$m | bc )
 		BFACTOR=${BFACTOR%.*}
-		$INTERVAL = 300 # 5 minuti se batteria
+		INTERVAL=300 # 5 minuti se batteria
 	else
-		$INTERVAL = 120 # 2 minuti se collegato AC
+		INTERVAL=120 # 2 minuti se collegato AC
 	fi
 }
 
