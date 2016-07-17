@@ -10,8 +10,9 @@ BFACTOR=10
 function getBright(){
 	while true 
 	do
-		standby=$(cat $BACKLIGHT_PATH/actual_brightness)
-echo "STANDBY: " $standby
+		if [[ $standby -eq 0 && $keybright -gt 0 ]]; then
+			setKeyboardBright
+		fi
 		if [ $standby -gt 0 ]; then # se monitor in standby non esegue script
 			getBrightValues
 			rm -f $CAPTURE
@@ -22,10 +23,9 @@ echo "STANDBY: " $standby
 			b=$(convert $CAPTURE -colorspace Gray -format "%[mean]" info: | awk -F'.' '{print $1}')
 			rm -f $CAPTURE
 			b=$((b/(BFACTOR *80)))
-echo "B: " $b
 			bres=$(((MAX*b)/100))
-echo "bres: " $bres
 			setBright
+			setKeyboardBright
 		fi
 		sleep $INTERVAL
 	done
@@ -44,16 +44,15 @@ function getBrightValues (){
 	else
 		INTERVAL=120 # 2 minuti se collegato AC
 	fi
+	
+	standby=$(cat $BACKLIGHT_PATH/actual_brightness)
+	keybright=$(cat "$KEYBOARD_PATH/brightness");
 }
 
 
 function setBright (){
-		setKeyboardBright
 		maxcn=$(( bres > CBR ? bres : CBR ))
 		mincn=$(( bres < CBR ? bres : CBR ))
-echo "MAXCN: " $maxcn
-echo "MINCN: " $mincn
-echo "BRES: " $bres
 	
 		if [[ $maxcn -eq $bres ]]; then
 			count=$mincn
@@ -64,7 +63,6 @@ echo "BRES: " $bres
 				fi
 				if [ $count2 -eq 5 ];then
 					echo $count > "$BACKLIGHT_PATH/brightness"
-echo "AUMENTO: " $count
 					count2=0
 					sleep 0.005
 				fi
@@ -82,7 +80,6 @@ echo "AUMENTO: " $count
 				fi
 				if [ $count2 -eq 5 ]; then
 					echo $count > "$BACKLIGHT_PATH/brightness"
-echo "DIMINUISCO: " $count
 					count2=0
 					sleep 0.005
 				fi
@@ -94,18 +91,27 @@ echo "DIMINUISCO: " $count
 
 
 function setKeyboardBright(){
-	if [ $bres -le "1100" ]; then
-	  	echo 1 > "$KEYBOARD_PATH/brightness"
+
+	kmax=$(cat "$KEYBOARD_PATH/max_brightness")
+
+	if [ $AC -eq 0 ]; then
+		kmax=1;
 	fi
-	if [ $bres -gt "1100" ]; then
-		echo 0 > "$KEYBOARD_PATH/brightness"
+	
+	kres=$(($kmax-(($bres*$kmax)/($MAX/$kmax))))
+	
+	if [[ $standby -gt 0 && $kres -eq 0 && $AC -eq 1 ]]; then
+		kres=1;
 	fi
+
+	echo $kres > "$KEYBOARD_PATH/brightness"
 }
 
 
 case "$1" in
 	start)
 		echo -en "Starting $0 \t"
+		getBrightValues
 		getBright &
 		if [ $? == 0 ];then
 			echo "[OK]"
