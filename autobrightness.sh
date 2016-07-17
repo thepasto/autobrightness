@@ -31,10 +31,14 @@ function getBright(){
 	done
 }
 
+function getStaticValues() {
+	MAX=$(cat "$BACKLIGHT_PATH/max_brightness")
+	KMAX=$(cat "$KEYBOARD_PATH/max_brightness")
+}
 
 function getBrightValues (){
 	AC=$(cat /sys/class/power_supply/AC0/online)
-	MAX=$(cat "$BACKLIGHT_PATH/max_brightness")
+	
 	CBR=$(cat "$BACKLIGHT_PATH/brightness")
 	if [ $AC == 0 ];then # batteria
 		m=$( echo $BFACTOR/10 | bc )
@@ -91,17 +95,18 @@ function setBright (){
 
 
 function setKeyboardBright(){
-
-	kmax=$(cat "$KEYBOARD_PATH/max_brightness")
-
-	if [ $AC -eq 0 ]; then
-		kmax=1;
-	fi
+	if [ $standby -eq 0 ]; then
+		kres=0;
+	else
+		if [ $AC -eq 0 ]; then
+			KMAX=1;
+		fi
 	
-	kres=$(($kmax-(($bres*$kmax)/($MAX/$kmax))))
+		kres=$(($KMAX-(($bres*$KMAX)/($MAX/$KMAX))))
 	
-	if [[ $standby -gt 0 && $kres -eq 0 && $AC -eq 1 ]]; then
-		kres=1;
+		if [[ $standby -gt 0 && $kres -eq 0 && $AC -eq 1 ]]; then
+			kres=1;
+		fi
 	fi
 
 	echo $kres > "$KEYBOARD_PATH/brightness"
@@ -111,6 +116,7 @@ function setKeyboardBright(){
 case "$1" in
 	start)
 		echo -en "Starting $0 \t"
+		getStaticValues
 		getBrightValues
 		getBright &
 		if [ $? == 0 ];then
