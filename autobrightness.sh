@@ -95,17 +95,18 @@ function setBright (){
 
 
 function setKeyboardBright(){
+	
 	if [ $standby -eq 0 ]; then
-		kres=0;
+		kres=0
 	else
 		if [ $AC -eq 0 ]; then
-			KMAX=1;
+			KMAX=1
 		fi
-	
+
 		kres=$(($KMAX-(($bres*$KMAX)/($MAX/$KMAX))))
-	
+
 		if [[ $standby -gt 0 && $kres -eq 0 && $AC -eq 1 ]]; then
-			kres=1;
+			kres=$KMAX
 		fi
 	fi
 
@@ -130,7 +131,7 @@ case "$1" in
 
 	stop) 
 		echo -en "Stopping $0 \t"
-		kill -15 $$ & > /dev/null
+		kill -s 15 $$ & > /dev/null
 		if [ $? == 0 ];then
 			echo "[OK]"
 		else
