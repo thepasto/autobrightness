@@ -1,23 +1,3 @@
-
-<html>
-  <body>
-    <script>
-      (async () => {
-        const response = await fetch('https://api.github.com/repos/thepasto/autobrightness/contents/');
-        const data = await response.json();
-        let htmlString = '<ul>';
-        for (let file of data) {
-          htmlString += `<li><a href="${file.path}">${file.name}</a></li>`;
-        }
-        htmlString += '</ul>';
-        document.getElementsByTagName('body')[0].innerHTML = htmlString;
-      })()
-    </script>
-  <body>
-</html>
-
-
-
 ## Welcome to GitHub Pages
 
 You can use the [editor on GitHub](https://github.com/thepasto/autobrightness/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
